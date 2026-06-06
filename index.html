@@ -76,7 +76,6 @@ header .tagline {
     flex-shrink: 0;
 }
 
-/* Outer decorative ring — matches max expansion */
 .circle-wrapper::before {
     content: "";
     position: absolute;
@@ -86,7 +85,6 @@ header .tagline {
     pointer-events: none;
 }
 
-/* Inner decorative ring — matches resting state */
 .circle-wrapper::after {
     content: "";
     position: absolute;
@@ -165,10 +163,13 @@ header .tagline {
     padding: 5px;
     border-radius: var(--radius-md);
     width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .mode-btn {
     flex: 1;
+    min-width: 60px;
     padding: 9px 8px;
     border: none;
     border-radius: var(--radius-sm);
@@ -247,7 +248,6 @@ header .tagline {
     box-shadow: 0 0 32px rgba(255, 77, 20, 0.15);
 }
 
-/* Status dot inside button */
 .status-dot {
     display: inline-block;
     width: 8px;
@@ -295,6 +295,88 @@ header .tagline {
     min-width: 4ch;
 }
 
+/* ─── Custom Mode Builder ─── */
+.custom-builder {
+    width: 100%;
+    max-width: 380px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    margin-top: -10px;
+}
+.custom-builder.open { display: flex; }
+
+.custom-builder .builder-title {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+.custom-builder .builder-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.custom-builder .builder-row label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 40px;
+}
+
+.custom-builder .builder-row input[type="number"] {
+    background: var(--bg);
+    border: 1px solid var(--text-muted);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    width: 55px;
+    text-align: center;
+    outline: none;
+}
+.custom-builder .builder-row input[type="number"]:focus {
+    border-color: var(--accent);
+}
+
+.custom-builder .builder-save-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 6px 20px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    align-self: center;
+    margin-top: 4px;
+}
+.custom-builder .builder-save-btn:hover { background: var(--accent-dark); }
+
+.custom-builder .builder-status {
+    font-size: 0.65rem;
+    color: #4caf7d;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.custom-builder .builder-status.show { opacity: 1; }
+
+.custom-builder .builder-row .sep {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 480px) {
     body { padding: 16px; }
@@ -339,7 +421,6 @@ header .tagline {
     }
 }
 
-/* Small height screens — reduce spacing */
 @media (max-height: 700px) {
     header { margin-bottom: 12px; }
     h1 { font-size: 1.3rem; }
@@ -396,6 +477,10 @@ header .tagline {
             4-2-4
             <span class="caption">Energizing</span>
         </button>
+        <button class="mode-btn" data-mode="custom">
+            Custom
+            <span class="caption">Your Mode</span>
+        </button>
     </div>
 
     <button class="start-btn" id="startBtn">
@@ -415,6 +500,27 @@ header .tagline {
     </div>
 </div>
 
+<!-- ─── Custom Breathing Mode Builder ─── -->
+<div class="custom-builder" id="customBuilder">
+    <div class="builder-title">⚙ Custom Breathing Pattern</div>
+    <div class="builder-row">
+        <label>Inhale</label>
+        <input type="number" id="customInhale" min="1" max="20" value="4">
+        <span class="sep">s</span>
+        <label>Hold</label>
+        <input type="number" id="customHold1" min="0" max="20" value="4">
+        <span class="sep">s</span>
+        <label>Exhale</label>
+        <input type="number" id="customExhale" min="1" max="20" value="4">
+        <span class="sep">s</span>
+        <label>Hold</label>
+        <input type="number" id="customHold2" min="0" max="20" value="4">
+        <span class="sep">s</span>
+    </div>
+    <button class="builder-save-btn" id="customSaveBtn">Save &amp; Apply</button>
+    <div class="builder-status" id="customStatus">✓ Saved!</div>
+</div>
+
 <script>
 (function () {
     "use strict";
@@ -429,6 +535,13 @@ header .tagline {
     const sessionTime  = document.getElementById("sessionTime");
     const cyclesCount  = document.getElementById("cyclesCount");
     const modeBtns     = document.querySelectorAll(".mode-btn");
+    const customBuilder = document.getElementById("customBuilder");
+    const customInhale  = document.getElementById("customInhale");
+    const customHold1   = document.getElementById("customHold1");
+    const customExhale  = document.getElementById("customExhale");
+    const customHold2   = document.getElementById("customHold2");
+    const customSaveBtn = document.getElementById("customSaveBtn");
+    const customStatus  = document.getElementById("customStatus");
 
     /* ── Breathing mode definitions ── */
     const MODES = {
@@ -453,22 +566,72 @@ header .tagline {
                 { name: "Hold",        duration: 2, scale: 1    },
                 { name: "Breathe Out", duration: 4, scale: 0.35 }
             ]
-        }
+        },
+        "custom": null // filled from localStorage or defaults
     };
 
     /* ── State ── */
     let mode          = "4-7-8";
     let isRunning     = false;
     let phaseIndex    = 0;
-    let phaseStart    = 0;     /* performance.now() at phase start */
+    let phaseStart    = 0;
     let sessionStart  = 0;
     let cycles        = 0;
     let rafId         = null;
     let sessionTimer  = null;
 
+    /* ── Custom mode persistence ── */
+    function loadCustomMode() {
+        try {
+            const raw = localStorage.getItem("br_custom");
+            if (raw) {
+                const data = JSON.parse(raw);
+                if (data && Array.isArray(data.phases) && data.phases.length > 0) {
+                    MODES["custom"] = { phases: data.phases };
+                    customInhale.value = data.phases[0] ? data.phases[0].duration : 4;
+                    if (data.phases[1]) customHold1.value = data.phases[1].duration;
+                    if (data.phases[2]) customExhale.value = data.phases[2].duration;
+                    if (data.phases[3]) customHold2.value = data.phases[3].duration;
+                    return;
+                }
+            }
+        } catch(e) {}
+        // Default custom mode
+        MODES["custom"] = {
+            phases: [
+                { name: "Breathe In",  duration: 4, scale: 1    },
+                { name: "Hold",        duration: 4, scale: 1    },
+                { name: "Breathe Out", duration: 4, scale: 0.35 },
+                { name: "Hold",        duration: 4, scale: 0.35 }
+            ]
+        };
+    }
+
+    function saveCustomMode() {
+        const inhale = parseInt(customInhale.value) || 4;
+        const hold1  = parseInt(customHold1.value) || 4;
+        const exhale = parseInt(customExhale.value) || 4;
+        const hold2  = parseInt(customHold2.value) || 4;
+        const phases = [
+            { name: "Breathe In",  duration: Math.max(1, inhale), scale: 1    },
+            { name: "Hold",        duration: Math.max(0, hold1),  scale: 1    },
+            { name: "Breathe Out", duration: Math.max(1, exhale), scale: 0.35 },
+            { name: "Hold",        duration: Math.max(0, hold2),  scale: 0.35 }
+        ];
+        // Remove trailing holds if zero
+        while (phases.length > 1 && phases[phases.length - 1].duration === 0) {
+            phases.pop();
+        }
+        MODES["custom"] = { phases: phases };
+        try {
+            localStorage.setItem("br_custom", JSON.stringify({ phases: phases }));
+        } catch(e) {}
+    }
+
     /* ── Helpers ── */
     function getPhases() {
-        return MODES[mode].phases;
+        const m = MODES[mode];
+        return m && m.phases ? m.phases : [];
     }
 
     function easeInOut(t) {
@@ -500,153 +663,155 @@ header .tagline {
         timerDisplay.className = "timer idle";
     }
 
-    function setPaused() {
-        phaseName.textContent = "Paused";
-        phaseName.className = "phase-name paused";
-    }
-
-    function setButtonState(running) {
-        if (running) {
-            startBtn.classList.add("running");
-            btnLabel.textContent = "Stop";
-            statusDot.classList.add("active");
+    function updateSessionTime() {
+        if (sessionStart > 0) {
+            var elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+            sessionTime.textContent = fmtTime(elapsed);
         } else {
-            startBtn.classList.remove("running");
-            btnLabel.textContent = "Start";
-            statusDot.classList.remove("active");
+            sessionTime.textContent = "00:00";
         }
     }
 
-    /* ── Core animation loop ── */
-    function tick(now) {
+    function setMode(newMode) {
+        var wasRunning = isRunning;
+        if (isRunning) stop();
+        mode = newMode;
+        cycles = 0;
+        cyclesCount.textContent = "0";
+        phaseIndex = 0;
+        sessionStart = 0;
+        updateSessionTime();
+
+        modeBtns.forEach(function(btn) {
+            var active = btn.dataset.mode === mode;
+            btn.classList.toggle("active", active);
+        });
+
+        // Show/hide custom builder
+        if (mode === "custom") {
+            customBuilder.classList.add("open");
+        } else {
+            customBuilder.classList.remove("open");
+        }
+
+        if (wasRunning) {
+            start();
+        } else {
+            setIdle();
+            circle.style.transition = "none";
+            circle.style.transform = "scale(0.35)";
+            circle.style.transition = "";
+        }
+    }
+
+    /* ── Animation ── */
+    function animate(timestamp) {
         if (!isRunning) return;
+        var phases = getPhases();
+        if (!phases.length) { stop(); return; }
 
-        var elapsed = (now - phaseStart) / 1000;
-        var phases  = getPhases();
-        var phase   = phases[phaseIndex];
-        var dur     = phase.duration;
+        var p = phases[phaseIndex];
+        var elapsed = (timestamp - phaseStart) / 1000;
+        var remaining = Math.max(0, p.duration - elapsed);
+        var progress = elapsed / p.duration;
 
-        /* --- Detect phase end --- */
-        if (elapsed >= dur) {
-            var nextIdx = (phaseIndex + 1) % phases.length;
-            if (nextIdx === 0) {
-                cycles += 1;
+        // Update timer countdown
+        timerDisplay.textContent = Math.ceil(remaining);
+
+        // Scale animation
+        var currentScale = 0.35;
+        if (p.scale !== undefined) {
+            var startScale = 0.35;
+            var endScale = p.scale;
+            var t = Math.min(1, progress);
+            var eased = easeInOut(t);
+            currentScale = startScale + (endScale - startScale) * eased;
+        }
+        circle.style.transform = "scale(" + currentScale + ")";
+
+        if (elapsed >= p.duration) {
+            // Move to next phase
+            phaseIndex = (phaseIndex + 1) % phases.length;
+            if (phaseIndex === 0) {
+                cycles++;
                 cyclesCount.textContent = cycles;
             }
-            phaseIndex  = nextIdx;
-            phaseStart  = now;
-            elapsed     = 0;
-            phase       = phases[phaseIndex];
-            dur         = phase.duration;
+            phaseStart = timestamp;
             showPhase(phaseIndex);
-
-            /* Snap circle to the *previous* phase's scale so the
-               transition starts from the correct visual position. */
-            var prevIdx = (phaseIndex - 1 + phases.length) % phases.length;
-            circle.style.transform = "scale(" + phases[prevIdx].scale + ")";
         }
 
-        /* --- Interpolate scale --- */
-        var prevIdx = (phaseIndex - 1 + phases.length) % phases.length;
-        var from    = phases[prevIdx].scale;
-        var to      = phase.scale;
-        var prog    = Math.min(elapsed / dur, 1);
-        var eased   = easeInOut(prog);
-        var s       = from + (to - from) * eased;
-
-        circle.style.transform = "scale(" + s + ")";
-
-        /* --- Timer --- */
-        var remaining = Math.max(0, Math.ceil(dur - elapsed));
-        timerDisplay.textContent = remaining;
-
-        /* --- Schedule next frame --- */
-        rafId = requestAnimationFrame(tick);
+        rafId = requestAnimationFrame(animate);
     }
 
     /* ── Start / Stop ── */
-    function startSession() {
+    function start() {
         if (isRunning) return;
+        var phases = getPhases();
+        if (!phases.length) return;
 
-        isRunning     = true;
-        cycles        = 0;
-        phaseIndex    = 0;
-        phaseStart    = performance.now();
-        sessionStart  = phaseStart;
+        isRunning = true;
+        sessionStart = sessionStart || Date.now();
+        phaseIndex = 0;
+        phaseStart = performance.now();
 
-        cyclesCount.textContent = "0";
-        setButtonState(true);
+        btnLabel.textContent = "Stop";
+        startBtn.classList.add("running");
+        statusDot.classList.add("active");
         showPhase(0);
 
-        /* Ensure circle starts at the contracted resting scale */
-        circle.style.transform = "scale(0.35)";
+        if (sessionTimer) clearInterval(sessionTimer);
+        sessionTimer = setInterval(updateSessionTime, 1000);
 
-        /* Begin animation loop */
-        rafId = requestAnimationFrame(tick);
-
-        /* Session time counter (updates every 500 ms) */
-        sessionTimer = setInterval(function () {
-            if (!isRunning) return;
-            sessionTime.textContent = fmtTime(
-                (performance.now() - sessionStart) / 1000
-            );
-        }, 500);
+        rafId = requestAnimationFrame(animate);
     }
 
-    function stopSession() {
-        if (!isRunning) return;
-
+    function stop() {
         isRunning = false;
+        btnLabel.textContent = "Start";
+        startBtn.classList.remove("running");
+        statusDot.classList.remove("active");
 
-        if (rafId) {
-            cancelAnimationFrame(rafId);
-            rafId = null;
-        }
-        if (sessionTimer) {
-            clearInterval(sessionTimer);
-            sessionTimer = null;
-        }
-
-        setButtonState(false);
-        setPaused();
-    }
-
-    function resetDisplay() {
-        stopSession();
-        setButtonState(false);
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        if (sessionTimer) { clearInterval(sessionTimer); sessionTimer = null; }
         setIdle();
         circle.style.transform = "scale(0.35)";
-        sessionTime.textContent = "00:00";
-        cyclesCount.textContent = "0";
-        cycles = 0;
     }
 
-    /* ── Mode switching ── */
-    function setMode(newMode) {
-        if (newMode === mode) return;
-        mode = newMode;
-
-        modeBtns.forEach(function (btn) {
-            btn.classList.toggle("active", btn.dataset.mode === newMode);
+    /* ── Event bindings ── */
+    modeBtns.forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            var newMode = this.dataset.mode;
+            if (newMode === mode) return;
+            setMode(newMode);
         });
-
-        resetDisplay();
-    }
-
-    /* ── Event wiring ── */
-    startBtn.addEventListener("click", function () {
-        isRunning ? stopSession() : startSession();
     });
 
-    modeBtns.forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            setMode(btn.dataset.mode);
-        });
+    startBtn.addEventListener("click", function() {
+        if (isRunning) { stop(); return; }
+        start();
+    });
+
+    customSaveBtn.addEventListener("click", function() {
+        saveCustomMode();
+        customStatus.classList.add("show");
+        setTimeout(function() { customStatus.classList.remove("show"); }, 2000);
+        // If custom mode is active, restart to apply new timing
+        if (mode === "custom") {
+            var wasRunning = isRunning;
+            stop();
+            // Reset state
+            cycles = 0;
+            cyclesCount.textContent = "0";
+            phaseIndex = 0;
+            sessionStart = 0;
+            updateSessionTime();
+            if (wasRunning) start();
+        }
     });
 
     /* ── Init ── */
-    setIdle();
-    circle.style.transform = "scale(0.35)";
+    loadCustomMode();
+    setMode("4-7-8");
 })();
 </script>
 </body>
